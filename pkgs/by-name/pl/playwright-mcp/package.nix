@@ -30,22 +30,12 @@ buildNpmPackage rec {
     ln -s ${playwright-test}/lib/node_modules/playwright "$pkg_dir/node_modules/playwright"
     ln -s ${playwright-test}/lib/node_modules/playwright-core "$pkg_dir/node_modules/playwright-core"
 
-    # PLAYWRIGHT_BROWSERS_PATH must point to a writable directory because playwright-mcp
-    # also creates browser profile directories there (mcp-<browser>-<hash>) at runtime.
-    # We set it to the user cache dir and populate it with symlinks to the nix store browsers.
+    # playwright-mcp creates browser profile dirs (mcp-<browser>-<hash>) inside
+    # PLAYWRIGHT_BROWSERS_PATH at runtime, so redirect them to a writable cache dir.
     wrapProgram $out/bin/playwright-mcp \
-      --set-default PLAYWRIGHT_MCP_BROWSER chromium \
-      --run '
-        _pwmcp_browsers_dir="''${XDG_CACHE_HOME:-$HOME/.cache}/ms-playwright"
-        mkdir -p "$_pwmcp_browsers_dir"
-        for _pwmcp_src in ${playwright-driver.browsers}/*; do
-          _pwmcp_name=$(basename "$_pwmcp_src")
-          if [ "$(readlink "$_pwmcp_browsers_dir/$_pwmcp_name" 2>/dev/null)" != "$_pwmcp_src" ]; then
-            ln -sfn "$_pwmcp_src" "$_pwmcp_browsers_dir/$_pwmcp_name"
-          fi
-        done
-        export PLAYWRIGHT_BROWSERS_PATH="$_pwmcp_browsers_dir"
-      '
+      --set PLAYWRIGHT_BROWSERS_PATH ${playwright-driver.browsers} \
+      --set-default PWMCP_PROFILES_DIR_FOR_TEST '$HOME/.cache/playwright-mcp-profiles' \
+      --set-default PLAYWRIGHT_MCP_BROWSER chromium
   '';
 
   dontNpmBuild = true;
